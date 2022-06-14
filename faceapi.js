@@ -1,13 +1,8 @@
-import * as tf from "@tensorflow/tfjs-node";
-import * as canvas from "canvas";
-// import * as faceapi from "face-api.js";
-import * as faceapi from "@vladmandic/face-api";
-import * as fs from "fs";
-// const { Canvas, Image, ImageData, loadImage } = require("canvas");
+const tf = require("@tensorflow/tfjs-node");
+const faceapi = require("@vladmandic/face-api");
+const fs = require("fs");
 
-// const { Canvas, Image, ImageData } = canvas;
-// faceapi.env.monkeyPatch({ Canvas, Image, ImageData });
-
+// https://github.com/vladmandic/face-api/blob/master/demo/node.js
 function loadImage(path) {
   const buffer = fs.readFileSync(path);
   const tensor = tf.tidy(() => {
@@ -32,37 +27,42 @@ function loadImage(path) {
   return tensor;
 }
 
-async function main() {
-  await faceapi.tf.setBackend("tensorflow");
-  await faceapi.tf.enableProdMode();
-  await faceapi.tf.ENV.set("DEBUG", false);
-  await faceapi.tf.ready();
-  await faceapi.nets.ssdMobilenetv1.loadFromDisk("./models");
+const minConfidence = 0.15;
+const maxResults = 5;
+const optionsSSDMobileNet = new faceapi.SsdMobilenetv1Options({
+  minConfidence,
+  maxResults,
+});
 
-  console.log(
-    `Version: TensorFlow/JS ${faceapi.tf?.version_core} FaceAPI ${
-      faceapi.version
-    } Backend: ${faceapi.tf?.getBackend()}`
-  );
-  const minConfidence = 0.15;
-  const maxResults = 5;
-  const optionsSSDMobileNet = new faceapi.SsdMobilenetv1Options({
-    minConfidence,
-    maxResults,
+let loaded = false;
+async function faces(path) {
+  if (!loaded) {
+    await faceapi.tf.setBackend("tensorflow");
+    await faceapi.tf.enableProdMode();
+    await faceapi.tf.ENV.set("DEBUG", false);
+    await faceapi.tf.ready();
+    await faceapi.nets.ssdMobilenetv1.loadFromDisk("./models");
+    loaded = true;
+  }
+
+  // console.log(
+  //   `Version: TensorFlow/JS ${faceapi.tf?.version_core} FaceAPI ${
+  //     faceapi.version
+  //   } Backend: ${faceapi.tf?.getBackend()}`
+  // );
+
+  const img = loadImage(path);
+  const results = await faceapi.detectAllFaces(img, optionsSSDMobileNet);
+  return results.map((result) => {
+    return {
+      x: Math.round(result._box._x),
+      y: Math.round(result._box._y),
+      w: Math.round(result._box._width),
+      h: Math.round(result._box._height),
+    };
   });
-
-  const img = loadImage("./frames/01.jpg");
-  const result = await faceapi.detectAllFaces(img, optionsSSDMobileNet);
-  console.log(result[0]._box);
-
-  // https://github.com/vladmandic/face-api/blob/master/demo/node.js
-
-  // const img = await canvas.loadImage("./frames/01.jpg");
-  // const detection = await faceapi.detectSingleFace(img);
-  // console.log({ detection });
-
-  // const detectionsForSize = faceapi.resizeResults(detections, { width: input.width, height: input.height })
-
-  // const detections = await faceapi.detectAllFaces(input)
 }
-main();
+
+module.exports = faces;
+
+// faces("./frames/01.jpg");

@@ -1,42 +1,43 @@
-// import * as tf from "@tensorflow/tfjs-node";
+const getFaces = require("./faceapi");
+const FFmpeg = require("fluent-ffmpeg");
+const Path = require("path");
+const fs = require("fs");
 
-// // Way faster but only works on linux. You need to have CUDA installed on your machine with an NVIDIA graphics card before going this route.
-// // import * as tf from '@tensorflow/tfjs-node-gpu'
-
-// const model = faceDetection.SupportedModels.MediaPipeFaceDetector;
-// const detectorConfig = {
-//   runtime: 'mediapipe', // or 'tfjs'
-// }
-// const detector = await faceDetection.createDetector(model, detectorConfig);
-// const faces = await detector.estimateFaces(image);
-
-// https://github.com/tensorflow/tfjs-models/tree/master/face-detection/src/tfjs
-import "@mediapipe/face_detection";
-import "@tensorflow/tfjs-core";
-// Register WebGL backend.
-// import "@tensorflow/tfjs-backend-webgl";
-// import * as tf from "@tensorflow/tfjs-node";
-import * as tf from "@tensorflow/tfjs";
-import * as faceDetection from "@tensorflow-models/face-detection";
-import * as fs from "fs";
-
-const readImage = (path) => tf.node.decodeImage(fs.readFileSync(path));
+function generateFrames(source, frameDir) {
+  return new Promise((resolve, reject) => {
+    const command = FFmpeg({ source })
+      // .withSize("320x240")
+      // .withVideoFilter("fps=1")
+      .saveToFile(Path.join(frameDir, "%d.jpg"))
+      .on("progress", (progress) => {
+        console.log(progress.percent);
+      })
+      .on("error", reject)
+      .on("end", resolve);
+  });
+}
 
 async function main() {
-  const model = faceDetection.SupportedModels.MediaPipeFaceDetector;
-  const detectorConfig = {
-    runtime: "tfjs",
-    // runtime: "mediapipe",
-    // solutionPath: "https://cdn.jsdelivr.net/npm/@mediapipe/face_detection",
-    // solutionPath: "base/node_modules/@mediapipe/face_detection",
-    maxFaces: 1,
-    modelType: "short", // "full" for >5m
-  };
-  const detector = await faceDetection.createDetector(model, detectorConfig);
+  for (let i = 2; i < process.argv.length; i++) {
+    const path = process.argv[i];
+    const frameDir = path + ".frames";
+    fs.mkdirSync(frameDir, { recursive: true });
 
-  const image = readImage("./frames/01.jpg");
-  console.log({ image });
-  const faces = await detector.estimateFaces(image);
-  console.log({ faces });
+    // await generateFrames(path, frameDir);
+    const framePaths = (await fs.promises.readdir(frameDir)).filter((path) =>
+      path.includes(".jpg")
+    );
+
+    const facePositions = {};
+    await Promise.all(
+      framePaths.map(async (framePath) => {
+        const frame = parseInt(framePath);
+        const faces = await getFaces(Path.join(frameDir, framePath));
+        facePositions[frame] = faces;
+        // console.log({ framePath, faces });
+      })
+    );
+    console.log(facePositions);
+  }
 }
 main();
