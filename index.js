@@ -15,28 +15,22 @@ import "@mediapipe/face_detection";
 import "@tensorflow/tfjs-core";
 // Register WebGL backend.
 // import "@tensorflow/tfjs-backend-webgl";
-import * as tf from "@tensorflow/tfjs-node";
+// import * as tf from "@tensorflow/tfjs-node";
+import * as tf from "@tensorflow/tfjs";
 import * as faceDetection from "@tensorflow-models/face-detection";
 import * as fs from "fs";
 
-const readImage = (path) => {
-  //reads the entire contents of a file.
-  //readFileSync() is synchronous and blocks execution until finished.
-  const imageBuffer = fs.readFileSync(path);
-  //Given the encoded bytes of an image,
-  //it returns a 3D or 4D tensor of the decoded image. Supports BMP, GIF, JPEG and PNG formats.
-  // const tfimage = tfnode.node.decodeImage(imageBuffer);
-  // return tfimage;
-  return tf.node.decodeImage(imageBuffer);
-};
+const readImage = (path) => tf.node.decodeImage(fs.readFileSync(path));
 
 async function main() {
   const model = faceDetection.SupportedModels.MediaPipeFaceDetector;
   const detectorConfig = {
+    runtime: "tfjs",
     // runtime: "mediapipe",
     // solutionPath: "https://cdn.jsdelivr.net/npm/@mediapipe/face_detection",
     // solutionPath: "base/node_modules/@mediapipe/face_detection",
-    runtime: "tfjs",
+    maxFaces: 1,
+    modelType: "short", // "full" for >5m
   };
   const detector = await faceDetection.createDetector(model, detectorConfig);
 
