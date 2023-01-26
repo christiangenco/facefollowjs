@@ -3,7 +3,31 @@ const FFmpeg = require("fluent-ffmpeg");
 const Path = require("path");
 const fs = require("fs");
 
+// http://yargs.js.org/docs/
+const yargs = require("yargs");
+
 const { repeatedSmooth, filterScript } = require("./utils");
+
+const argv = yargs
+  .option("zoom", {
+    alias: "z",
+    description:
+      "Zoom factor for how closely to zoom into the face. 1 is no zoom, 2 is a 2x zoom in on the face (default). Output video will be always be square.",
+    type: "number",
+    default: 2,
+  })
+  .option("delay", {
+    alias: "d",
+    description:
+      "How many frames should this script wait after a face moves to move the camera? 0 feels kinda robotic, 8 feels about right (default).",
+    type: "number",
+    default: 8,
+  })
+  .help()
+  .alias("help", "h").argv;
+
+const { zoom, delay } = argv;
+const paths = argv._;
 
 function generateFrames(source, frameDir) {
   return new Promise((resolve, reject) => {
@@ -29,16 +53,24 @@ function getMetadata(path) {
 }
 
 async function main() {
-  for (let i = 2; i < process.argv.length; i++) {
-    const path = process.argv[i];
-    console.info(path);
+  for (let i = 0; i < paths.length; i++) {
+    const path = paths[i];
 
     const zoom = 2;
     const metadata = await getMetadata(path);
     const { width, height, duration } = metadata.streams[0];
     const outputWidth = Math.round(width / zoom);
     const outputHeight = Math.round(height / zoom);
-    console.log({ width, height, duration, zoom, outputWidth, outputHeight });
+
+    console.log({
+      path,
+      width,
+      height,
+      duration,
+      zoom,
+      outputWidth,
+      outputHeight,
+    });
 
     const frameJsonPath = path + ".frames.json";
     let facePositions;
@@ -87,7 +119,7 @@ async function main() {
       width,
       height,
       zoom,
-      delay: 15,
+      delay,
     });
     fs.writeFileSync(filterScriptPath, script);
 
